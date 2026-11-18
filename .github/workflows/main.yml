@@ -44,26 +44,32 @@ jobs:
           
           echo "RDP_CREDS=User: $username | Password: $password" >> $env:GITHUB_ENV
 
-      - name: Install Browser Extensions
+      - name: Disable Chrome Location & Passwords + Install Extensions
         run: |
-          $chromePath = "HKLM:\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist"
+          $chromePath = "HKLM:\SOFTWARE\Policies\Google\Chrome"
           if (-not (Test-Path $chromePath)) { New-Item -Path $chromePath -Force | Out-Null }
-          New-ItemProperty -Path $chromePath -Name "1" -Value "lfkgcfakbpblpflbjanpoaipofoodnen;https://clients2.google.com/service/update2/crx" -PropertyType String -Force | Out-Null
-          New-ItemProperty -Path $chromePath -Name "2" -Value "majdfhpaihoncoakbjgbdhglocklcgno;https://clients2.google.com/service/update2/crx" -PropertyType String -Force | Out-Null
+          
+          New-ItemProperty -Path $chromePath -Name "DefaultGeolocationSetting" -Value 2 -PropertyType DWORD -Force | Out-Null
+          New-ItemProperty -Path $chromePath -Name "PasswordManagerEnabled" -Value 0 -PropertyType DWORD -Force | Out-Null
+
+          $extensionPath = "$chromePath\ExtensionInstallForcelist"
+          if (-not (Test-Path $extensionPath)) { New-Item -Path $extensionPath -Force | Out-Null }
+          New-ItemProperty -Path $extensionPath -Name "1" -Value "lfkgcfakbpblpflbjanpoaipofoodnen;https://clients2.google.com/service/update2/crx" -PropertyType String -Force | Out-Null
+          New-ItemProperty -Path $extensionPath -Name "2" -Value "majdfhpaihoncoakbjgbdhglocklcgno;https://clients2.google.com/service/update2/crx" -PropertyType String -Force | Out-Null
           
           $edgePath = "HKLM:\SOFTWARE\Policies\Microsoft\Edge\ExtensionInstallForcelist"
           if (-not (Test-Path $edgePath)) { New-Item -Path $edgePath -Force | Out-Null }
           New-ItemProperty -Path $edgePath -Name "1" -Value "pciakllldcajllepkbbihkmfkikheffb;https://edge.microsoft.com/extensionwebstorebase/v1/crx" -PropertyType String -Force | Out-Null
           New-ItemProperty -Path $edgePath -Name "2" -Value "gmgoamodcdcjnbaobigkjelfplakmdhh;https://edge.microsoft.com/extensionwebstorebase/v1/crx" -PropertyType String -Force | Out-Null
 
-      - name: Install Macro Recorder & AnyDesk
+      - name: Install Macro Recorder, Configure Registry & AnyDesk
         shell: pwsh
         run: |
           $desktopPath = "C:\Users\Public\Desktop"
           $rarPath = "$desktopPath\ahmad.rar"
           $extractPath = "$desktopPath\ahmad_extracted"
           
-          # نیا گوگل ڈرائیو لنک ڈائریکٹ ڈاؤن لوڈ فارمیٹ میں
+          # آپ کے دیے گئے لنک کا ڈائریکٹ ڈاؤن لوڈ لنک
           $directUrl = "https://drive.usercontent.google.com/download?id=1vhj1T94IFssFmckNgifW-gBJNci4Rc53&export=download&authuser=0"
           
           Write-Host "Downloading Macro Recorder..."
@@ -77,16 +83,23 @@ jobs:
               Start-Process -FilePath $installerPath -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/quiet", "/NORESTART" -Wait
           }
 
-          Write-Host "Registering Macro Recorder in Registry..."
+          Write-Host "Registering Macro Recorder (Keys & Infinite Loop = 0)..."
           $regPath = "HKCU:\SOFTWARE\Jitbit\Macro Recorder"
           if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
+          
           $serialKey = "HGCNNGujba4SdhQELI56YkubWcJe4MMhOw6mrqdA3WdWKp63lGmQgQSw"
           New-ItemProperty -Path $regPath -Name "Email" -Value "1" -PropertyType String -Force | Out-Null
           New-ItemProperty -Path $regPath -Name "Code" -Value $serialKey -PropertyType String -Force | Out-Null
+          
+          # Macro Recorder Keys & Loop Settings
+          New-ItemProperty -Path $regPath -Name "AbortPlayKey" -Value 113 -PropertyType DWORD -Force | Out-Null
+          New-ItemProperty -Path $regPath -Name "AbortPlayKeyMod" -Value 0 -PropertyType DWORD -Force | Out-Null
+          
+          New-ItemProperty -Path $regPath -Name "PausePlayKey" -Value 112 -PropertyType DWORD -Force | Out-Null
+          New-ItemProperty -Path $regPath -Name "PausePlayKeyMod" -Value 0 -PropertyType DWORD -Force | Out-Null
+          
+          New-ItemProperty -Path $regPath -Name "NumberOfPlaybacks" -Value 0 -PropertyType DWORD -Force | Out-Null
 
-          # ---------------------------------------------------------
-          # AnyDesk کو ڈاؤن لوڈ اور C:\AnyDesk میں انسٹال کرنا تاکہ Space کا مسئلہ نہ آئے
-          # ---------------------------------------------------------
           Write-Host "Downloading and Installing AnyDesk..."
           $anydeskUrl = "https://download.anydesk.com/AnyDesk.exe"
           $anydeskPath = "$env:TEMP\AnyDesk.exe"
@@ -98,7 +111,6 @@ jobs:
           Start-Sleep -Seconds 10
           
           Write-Host "Setting AnyDesk Password for Unattended Access..."
-          # AnyDesk کا نیا پاسورڈ
           cmd.exe /c 'echo Mtass$721 | C:\AnyDesk\AnyDesk.exe --set-password'
           
           Write-Host "Getting AnyDesk ID..."
